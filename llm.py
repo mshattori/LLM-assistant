@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import os
-import re
 import sys
 from argparse import ArgumentParser
 
@@ -9,6 +8,8 @@ import yaml
 
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
+
+from message import MessageExpander
 
 
 def create_llm(model_name: str = None, **kwargs) -> ChatOpenAI:
@@ -33,7 +34,6 @@ def create_llm(model_name: str = None, **kwargs) -> ChatOpenAI:
 
     return ChatOpenAI(model_name=model_name, **kwargs)
 
-
 def extend_llm_callbacks(callbacks: list = []) -> list:
     """Extend the list of callbacks with LangFuse callback if applicable.
 
@@ -47,36 +47,6 @@ def extend_llm_callbacks(callbacks: list = []) -> list:
         from langfuse.callback import CallbackHandler
         callbacks.append(CallbackHandler())
     return callbacks
-
-
-def expand_message(message: str) -> str:
-    """Expand the message by handling special commands for file imports.
-
-    Args:
-        message: The message string that may contain file import commands.
-
-    Returns:
-        The expanded message with file contents included.
-    """
-    matches = re.findall(r'\[(.*)\]\((.+)\)', message)
-    for name, path in matches:
-        match = f'[{name}]({path})'
-        name = name.strip()
-        path = path.strip()
-
-        if os.path.exists(path):
-            with open(path, 'r') as f:
-                content = f.read()
-            if not name:
-                name = os.path.basename(path)
-            if name:
-                content = f'### {name} ###\n```\n{content}\n```\n'
-            message = message.replace(match, content)
-        else:
-            print(f'File not found: {path}', file=sys.stderr)
-
-    return message
-
 
 def load_prompt_file(prompt_file: str) -> dict:
     """Load the prompt file and return its contents.
@@ -108,6 +78,11 @@ def main():
         parser.print_usage()
         sys.exit(1)
 
+    if args.enable_import:
+        expand_fn = MessageExpander().expand_message
+    else:
+        expand_fn = lambda s: HumanMessage(s)
+
     messages = []
     if args.prompt_file:
         prompt = load_prompt_file(args.prompt_file)
@@ -116,15 +91,11 @@ def main():
 
         if 'user' in prompt:
             if args.message:
-                messages.append(HumanMessage(prompt['user']))
+                messages.append(expand_fn(prompt['user']))
             else:
                 args.message = prompt['user']
 
-    messages.append(HumanMessage(args.message))
-
-    if args.enable_import:
-        for message in messages:
-            message.content = expand_message(message.content)
+    messages.append(expand_fn(args.message))
 
     model_name = prompt.get('model') if args.prompt_file else None
     llm = create_llm(model_name=model_name)
