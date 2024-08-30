@@ -243,4 +243,5 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.toptal.com/developers/gitignore/api/linux,osx,windows,python
+.vscode/
 persistent_db/
