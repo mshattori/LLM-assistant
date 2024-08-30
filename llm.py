@@ -93,7 +93,7 @@ def load_prompt_file(prompt_file: str) -> dict:
 
 def main():
     """Main function to execute the script."""
-    load_dotenv()
+    load_dotenv(override=True)
     parser = ArgumentParser()
     parser.add_argument('--prompt-file', '-p', required=False,
                         help='Prompt file in YAML format')
