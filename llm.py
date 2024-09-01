@@ -66,7 +66,9 @@ def main():
     load_dotenv(override=True)
     parser = ArgumentParser()
     parser.add_argument('--prompt-file', '-p', required=False,
-                        help='Prompt file in YAML format')
+                        help='Prompt file')
+    parser.add_argument('--system-file', '-s', required=False,
+                        help='System file in YAML format')
     parser.add_argument('--output-file', '-o', required=False)
     parser.add_argument('--enable-import', '-i', action='store_true',
                         default=True, help='Enable file imports in messages')
@@ -84,20 +86,27 @@ def main():
         expand_fn = lambda s: HumanMessage(s)
 
     messages = []
+
+    # Append system message if provided
+    if args.system_file:
+        with open(args.system_file) as f:
+            system_config = yaml.safe_load(f)
+        if 'system' in system_config:
+            messages.append(SystemMessage(system_config['system']))
+
+    # Append user message if provided
     if args.prompt_file:
-        prompt = load_prompt_file(args.prompt_file)
-        if 'system' in prompt:
-            messages.append(SystemMessage(prompt['system']))
+        with open(args.prompt_file) as f:
+            prompt = f.read()
+        if args.message:
+            messages.append(expand_fn(prompt))
+        else:
+            args.message = prompt
 
-        if 'user' in prompt:
-            if args.message:
-                messages.append(expand_fn(prompt['user']))
-            else:
-                args.message = prompt['user']
-
+    # Append user message from command line
     messages.append(expand_fn(args.message))
 
-    model_name = prompt.get('model') if args.prompt_file else None
+    model_name = system_config.get('model') if args.system_file else None
     llm = create_llm(model_name=model_name)
     response = llm.invoke(messages, config={'callbacks': extend_llm_callbacks()})
 
