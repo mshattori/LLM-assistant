@@ -1,8 +1,11 @@
 import os
 import re
 import base64
+from io import BytesIO
 
 from langchain_core.messages import HumanMessage
+
+import pdf2image
 
 
 def encode_image(image_path: str) -> str:
@@ -37,6 +40,8 @@ class MessageExpander:
                     file_extension = os.path.splitext(path)[1].lower()
                     if file_extension in self.IMAGE_EXTENSIONS:
                         self._append_image_content(name, path)
+                    elif file_extension == '.pdf':
+                        self._append_pdf_content(path)
                     else:
                         self._append_file_content(name, path)
                     continue
@@ -92,3 +97,15 @@ class MessageExpander:
                 'url': f'data:image/{image_type};base64,{base64_image}'
             }
         })
+
+    def _append_pdf_content(self, pdf_path: str):
+        for image in pdf2image.convert_from_path(pdf_path):
+            buffered = BytesIO()
+            image.save(buffered, format='jpeg')
+            img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
+            self.content_list.append({
+                'type': 'image_url',
+                'image_url': {
+                    'url': f'data:image/jpg;base64,{img_str}'
+                }
+            })
