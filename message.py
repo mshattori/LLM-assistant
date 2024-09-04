@@ -4,6 +4,7 @@ import base64
 from io import BytesIO
 
 from langchain_core.messages import HumanMessage
+from langchain_community.document_loaders import ConfluenceLoader
 
 import pdf2image
 
@@ -18,6 +19,7 @@ class MessageExpander:
 
     def __init__(self):
         self.content_list = []
+        self.confluence_loader = ConfluencePageLoader()
 
     def expand_message(self, message: str) -> HumanMessage:
         """Expand the message by expanding file imports.
@@ -34,7 +36,10 @@ class MessageExpander:
                 name, path = match.groups()
                 name = name.strip()
                 path = path.strip()
-                if os.path.exists(path):
+                if self.confluence_loader.is_confluence_url(path):
+                    content = self.confluence_loader.load(path)
+                    self._append_text_content(content)
+                elif os.path.exists(path):
                     if not name:
                         name = os.path.basename(path)
                     file_extension = os.path.splitext(path)[1].lower()
@@ -44,7 +49,9 @@ class MessageExpander:
                         self._append_pdf_content(path)
                     else:
                         self._append_file_content(name, path)
-                    continue
+                else:
+                    self._append_text_content(segment)
+                break
             self._append_text_content(segment)
 
         if len(self.content_list) == 1 and self.content_list[0].get('type') == 'text':
@@ -109,3 +116,28 @@ class MessageExpander:
                     'url': f'data:image/jpg;base64,{img_str}'
                 }
             })
+
+class ConfluencePageLoader:
+    def __init__(self):
+        self.url = os.environ.get('CONFLUENCE_WIKI_URL')
+        self.username = os.environ.get('ATTLASIAN_USER_EMAIL')
+        self.api_key = os.environ.get('ATTLASIAN_API_TOKEN')
+
+    def is_confluence_url(self, url):
+        return url.startswith(self.url)
+
+    def load(self, url):
+        match = re.match(rf'{self.url}/(?:\S+/)+pages/(\d+)/.*', url)
+        if not match:
+            raise ValueError(f'Invalid Confluence URL: {url}')
+        page_id = match.group(1)
+        loader = ConfluenceLoader(
+            url=self.url,
+            username=self.username,
+            api_key=self.api_key,
+            page_ids=[page_id],
+            keep_markdown_format=True
+        )
+        doc = loader.load()[0]
+        title = doc.metadata['title']
+        return f'### {title} ###\n' + doc.page_content
