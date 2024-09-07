@@ -15,7 +15,7 @@ def encode_image(image_path: str) -> str:
 
 class MessageExpander:
     IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif'}
-    IMPORTER_PATTERN = r'\[(.*)\]\((.+)\)'
+    IMPORTER_PATTERN = r'\{(.*?)\}'
 
     def __init__(self):
         self.content_list = []
@@ -33,22 +33,22 @@ class MessageExpander:
         segments = self._separate_message(message)
         for segment in segments:
             if match := re.match(self.IMPORTER_PATTERN, segment):
-                name, path = match.groups()
-                name = name.strip()
-                path = path.strip()
+                path, options = self._parse_placeholder(match.group(1))
+                title = options.get('title')
+
                 if self.confluence_loader.is_confluence_url(path):
                     content = self.confluence_loader.load(path)
                     self._append_text_content(content)
                 elif os.path.exists(path):
-                    if not name:
-                        name = os.path.basename(path)
+                    if not title:
+                        title = os.path.basename(path)
                     file_extension = os.path.splitext(path)[1].lower()
                     if file_extension in self.IMAGE_EXTENSIONS:
-                        self._append_image_content(name, path)
+                        self._append_image_content(title, path)
                     elif file_extension == '.pdf':
                         self._append_pdf_content(path)
                     else:
-                        self._append_file_content(name, path)
+                        self._append_file_content(title, path)
                 else:
                     self._append_text_content(segment)
                 continue
@@ -79,23 +79,34 @@ class MessageExpander:
 
         return segments
 
+    @staticmethod
+    def _parse_placeholder(placeholder_str: str) -> dict:
+        if '|' not in placeholder_str:
+            return placeholder_str, {}
+        path, options_str = placeholder_str.split('|')
+        options = {}
+        for option in options_str.split(';'):
+            key, value = option.split('=', 1)
+            options[key.strip()] = value.strip()
+        return path.strip(), options
+
     def _append_text_content(self, content):
         if self.content_list and self.content_list[-1].get('type') == 'text':
             self.content_list[-1]['text'] += '\n' + content
         else:
             self.content_list.append({'type': 'text', 'text': content})
 
-    def _append_file_content(self, name, path):
+    def _append_file_content(self, title, path):
         with open(path, 'r') as f:
             file_content = f.read()
-        if name:
-            file_content = f'### {name} ###\n```\n{file_content}\n```\n'
+        if title:
+            file_content = f'### {title} ###\n```\n{file_content}\n```\n'
         self._append_text_content(file_content)
 
-    def _append_image_content(self, name, path):
-        if name:
-            title = f'### {name} ###\n'
-            self._append_text_content(title)
+    def _append_image_content(self, title, path):
+        if title:
+            title_text = f'### {title} ###\n'
+            self._append_text_content(title_text)
         base64_image = encode_image(path)
         image_type = os.path.splitext(path)[1].lstrip('.')
         self.content_list.append({
