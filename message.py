@@ -5,6 +5,7 @@ from io import BytesIO
 
 from langchain_core.messages import HumanMessage
 from langchain_community.document_loaders import ConfluenceLoader
+from langchain_community.document_loaders import WebBaseLoader
 
 import pdf2image
 
@@ -19,7 +20,7 @@ class MessageExpander:
 
     def __init__(self):
         self.content_list = []
-        self.confluence_loader = ConfluencePageLoader()
+        self.loaders = [WebPageLoader(), ConfluencePageLoader()]
 
     def expand_message(self, message: str) -> HumanMessage:
         """Expand the message by expanding file imports.
@@ -36,9 +37,15 @@ class MessageExpander:
                 path, options = self._parse_placeholder(match.group(1))
                 title = options.get('title')
 
-                if self.confluence_loader.is_confluence_url(path):
-                    content = self.confluence_loader.load(path)
-                    self._append_text_content(content)
+                handled_by_loader = False
+                for loader in self.loaders:
+                    if loader.is_target_path(path):
+                        content = loader.load(path)
+                        self._append_text_content(content)
+                        handled_by_loader = True
+                        break
+                if handled_by_loader:
+                    continue
                 elif os.path.exists(path):
                     if not title:
                         title = os.path.basename(path)
@@ -128,22 +135,23 @@ class MessageExpander:
                 }
             })
 
+# dependencies: atlassian-python-api, lxml
 class ConfluencePageLoader:
     def __init__(self):
-        self.url = os.environ.get('CONFLUENCE_WIKI_URL')
+        self.base_url = os.environ.get('CONFLUENCE_WIKI_URL')
         self.username = os.environ.get('ATTLASIAN_USER_EMAIL')
         self.api_key = os.environ.get('ATTLASIAN_API_TOKEN')
 
-    def is_confluence_url(self, url):
-        return url.startswith(self.url)
+    def is_target_path(self, url):
+        return url.startswith(self.base_url)
 
-    def load(self, url):
-        match = re.match(rf'{self.url}/(?:\S+/)+pages/(\d+)/.*', url)
+    def load(self, path):
+        match = re.match(rf'{self.base_url}/(?:\S+/)+pages/(\d+)/.*', path)
         if not match:
-            raise ValueError(f'Invalid Confluence URL: {url}')
+            raise ValueError(f'Invalid Confluence URL: {path}')
         page_id = match.group(1)
         loader = ConfluenceLoader(
-            url=self.url,
+            url=self.base_url,
             username=self.username,
             api_key=self.api_key,
             page_ids=[page_id],
@@ -151,4 +159,20 @@ class ConfluencePageLoader:
         )
         doc = loader.load()[0]
         title = doc.metadata['title']
+        return f'### {title} ###\n' + doc.page_content
+
+# dependencies: langchain_community, beautifulsoup4
+class WebPageLoader:
+    def __init__(self):
+        pass
+
+    def is_target_path(self, path):
+        from urllib.parse import urlparse
+        parsed_url = urlparse(path)
+        return parsed_url.scheme in ['http', 'https']
+
+    def load(self, path):
+        loader = WebBaseLoader(path)
+        doc = loader.load()[0]
+        title = doc.metadata.get('title', 'Untitled')
         return f'### {title} ###\n' + doc.page_content
