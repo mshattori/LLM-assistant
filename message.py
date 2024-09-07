@@ -51,7 +51,7 @@ class MessageExpander:
                         self._append_file_content(name, path)
                 else:
                     self._append_text_content(segment)
-                break
+                continue
             self._append_text_content(segment)
 
         if len(self.content_list) == 1 and self.content_list[0].get('type') == 'text':
