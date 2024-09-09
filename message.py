@@ -20,7 +20,9 @@ class MessageExpander:
 
     def __init__(self):
         self.content_list = []
-        self.loaders = [WebPageLoader(), ConfluencePageLoader()]
+        # Note that ConfluencePageLoader must precede WebPageLoader,
+        # otherwise the WebPageLoader will always be used for https URLs
+        self.loaders = [ConfluencePageLoader(), WebPageLoader()]
 
     def expand_message(self, message: str) -> HumanMessage:
         """Expand the message by expanding file imports.
