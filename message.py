@@ -53,7 +53,7 @@ class MessageExpander:
                     if file_extension in self.IMAGE_EXTENSIONS:
                         self._append_image_content(title, path)
                     elif file_extension == '.pdf':
-                        self._append_pdf_content(path)
+                        self._append_pdf_content(title, path, options)
                     else:
                         self._append_file_content(title, path)
                 else:
@@ -123,8 +123,28 @@ class MessageExpander:
             }
         })
 
-    def _append_pdf_content(self, pdf_path: str):
-        for image in pdf2image.convert_from_path(pdf_path):
+    def _parse_pages(self, pages: str) -> list:
+        """Parse the pages option and return a list of page numbers."""
+        page_numbers = set()
+        for part in pages.split(','):
+            if '-' in part:
+                start, end = map(int, part.split('-'))
+                page_numbers.update(range(start, end + 1))
+            else:
+                page_numbers.add(int(part))
+        return sorted(page_numbers)
+
+    def _append_pdf_content(self, title: str, pdf_path: str, options: dict):
+        if title:
+            title_text = f'### {title} ###\n'
+            self._append_text_content(title_text)
+        pages_option = options.get('pages')
+        page_numbers = self._parse_pages(pages_option) if pages_option else None
+
+        for index, image in enumerate(pdf2image.convert_from_path(pdf_path)):
+            page = index + 1
+            if page_numbers and page not in page_numbers:
+                continue
             buffered = BytesIO()
             image.save(buffered, format='jpeg')
             img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
