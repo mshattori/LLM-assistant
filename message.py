@@ -4,10 +4,9 @@ import base64
 from io import BytesIO
 
 from langchain_core.messages import HumanMessage
-from langchain_community.document_loaders import ConfluenceLoader
-from langchain_community.document_loaders import WebBaseLoader
-
 import pdf2image
+
+import loader
 
 
 def encode_image(image_path: str) -> str:
@@ -22,7 +21,10 @@ class MessageExpander:
         self.content_list = []
         # Note that ConfluencePageLoader must precede WebPageLoader,
         # otherwise the WebPageLoader will always be used for https URLs
-        self.loaders = [ConfluencePageLoader(), WebPageLoader()]
+        self.loaders = [
+            loader.ConfluencePageLoader(),
+            loader.WebPageLoader()
+        ]
 
     def expand_message(self, message: str) -> HumanMessage:
         """Expand the message by expanding file imports.
@@ -183,21 +185,4 @@ class ConfluencePageLoader:
             keep_markdown_format=True
         )
         doc = loader.load()[0]
-        return doc
-
-# dependencies: langchain_community, beautifulsoup4
-class WebPageLoader:
-    def __init__(self):
-        pass
-
-    def is_target_path(self, path):
-        from urllib.parse import urlparse
-        parsed_url = urlparse(path)
-        return parsed_url.scheme in ['http', 'https']
-
-    def load(self, path):
-        loader = WebBaseLoader(path)
-        doc = loader.load()[0]
-        if not doc.metadata.get('title'):
-            doc.metadata['title'] = 'Untitled'
         return doc
