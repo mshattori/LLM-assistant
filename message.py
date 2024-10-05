@@ -42,7 +42,10 @@ class MessageExpander:
                 handled_by_loader = False
                 for loader in self.loaders:
                     if loader.is_target_path(path):
-                        content = loader.load(path)
+                        doc = loader.load(path)
+                        if not title:
+                            title = doc.metadata['title']
+                        content = f'### {title} ###\n' + doc.page_content
                         self._append_text_content(content)
                         handled_by_loader = True
                         break
@@ -180,8 +183,7 @@ class ConfluencePageLoader:
             keep_markdown_format=True
         )
         doc = loader.load()[0]
-        title = doc.metadata['title']
-        return f'### {title} ###\n' + doc.page_content
+        return doc
 
 # dependencies: langchain_community, beautifulsoup4
 class WebPageLoader:
@@ -196,5 +198,6 @@ class WebPageLoader:
     def load(self, path):
         loader = WebBaseLoader(path)
         doc = loader.load()[0]
-        title = doc.metadata.get('title', 'Untitled')
-        return f'### {title} ###\n' + doc.page_content
+        if not doc.metadata.get('title'):
+            doc.metadata['title'] = 'Untitled'
+        return doc
