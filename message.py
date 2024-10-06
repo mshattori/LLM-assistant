@@ -133,18 +133,43 @@ class MessageExpander:
             self._append_text_content(title_text)
         page_numbers = options.get('pages')
 
-        for page_index, image in enumerate(pdf2image.convert_from_path(pdf_path)):
-            if page_numbers and page_index not in page_numbers:
-                continue
-            buffered = BytesIO()
-            image.save(buffered, format='jpeg')
-            img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
-            self.content_list.append({
-                'type': 'image_url',
-                'image_url': {
-                    'url': f'data:image/jpg;base64,{img_str}'
-                }
-            })
+        if page_numbers:
+            for start, end in self._compute_page_ranges(page_numbers):
+                for image in pdf2image.convert_from_path(pdf_path, first_page=start, last_page=end):
+                    self._process_page_image(image)
+        else:
+            for image in pdf2image.convert_from_path(pdf_path):
+                self._process_page_image(image)
+
+    def _compute_page_ranges(self, page_numbers):
+        ranges = []
+        page_numbers = sorted(set(page_numbers))
+        # Convert to page numbers starting from 1
+        page_numbers = [n + 1 for n in page_numbers]
+        start = page_numbers[0]
+        end = start
+
+        for page in page_numbers[1:]:
+            if page == end + 1:
+                end = page
+            else:
+                ranges.append((start, end))
+                start = page
+                end = start
+        ranges.append((start, end))
+
+        return ranges
+
+    def _process_page_image(self, image):
+        buffered = BytesIO()
+        image.save(buffered, format='jpeg')
+        img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
+        self.content_list.append({
+            'type': 'image_url',
+            'image_url': {
+                'url': f'data:image/jpg;base64,{img_str}'
+            }
+        })
 
 # dependencies: atlassian-python-api, lxml
 class ConfluencePageLoader:
