@@ -98,10 +98,7 @@ class MessageExpander:
         if '|' not in placeholder_str:
             return placeholder_str, {}
         path, options_str = placeholder_str.split('|')
-        options = {}
-        for option in options_str.split(';'):
-            key, value = option.split('=', 1)
-            options[key.strip()] = value.strip()
+        options = loader.LoaderOptionParser().parse(options_str)
         return path.strip(), options
 
     def _append_text_content(self, content):
@@ -130,27 +127,14 @@ class MessageExpander:
             }
         })
 
-    def _parse_pages(self, pages: str) -> list:
-        """Parse the pages option and return a list of page numbers."""
-        page_numbers = set()
-        for part in pages.split(','):
-            if '-' in part:
-                start, end = map(int, part.split('-'))
-                page_numbers.update(range(start, end + 1))
-            else:
-                page_numbers.add(int(part))
-        return sorted(page_numbers)
-
     def _append_pdf_content(self, title: str, pdf_path: str, options: dict):
         if title:
             title_text = f'### {title} ###\n'
             self._append_text_content(title_text)
-        pages_option = options.get('pages')
-        page_numbers = self._parse_pages(pages_option) if pages_option else None
+        page_numbers = options.get('pages')
 
-        for index, image in enumerate(pdf2image.convert_from_path(pdf_path)):
-            page = index + 1
-            if page_numbers and page not in page_numbers:
+        for page_index, image in enumerate(pdf2image.convert_from_path(pdf_path)):
+            if page_numbers and page_index not in page_numbers:
                 continue
             buffered = BytesIO()
             image.save(buffered, format='jpeg')
