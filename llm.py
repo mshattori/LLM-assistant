@@ -74,6 +74,8 @@ def main():
                         default=True, help='Enable file imports in messages')
     parser.add_argument('--verbose', '-v', action='store_true')
     parser.add_argument('--message', '-m', type=str, required=False)
+    parser.add_argument('--model', type=str, required=False,
+                        help='Model name to override the default or system file model')
     args = parser.parse_args()
 
     if not args.message and not args.prompt_file:
@@ -106,7 +108,13 @@ def main():
     # Append user message from command line
     messages.append(expand_fn(args.message))
 
-    model_name = system_config.get('model') if args.system_file else None
+    # Determine the model name
+    model_name = None
+    if args.model:
+        model_name = args.model 
+    elif args.system_file:
+        model_name = system_config.get('model') 
+
     llm = create_llm(model_name=model_name)
     response = llm.invoke(messages, config={'callbacks': extend_llm_callbacks()})
 
