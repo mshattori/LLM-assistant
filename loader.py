@@ -1,11 +1,9 @@
+#!/usr/bin/env python
 import os
 import re
 from langchain_community.document_loaders import ConfluenceLoader
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_core.documents import Document
-
-from pdfminer.high_level import extract_text
-from pdfminer.layout import LAParams
 
 
 class LoaderOptionParser():
@@ -87,6 +85,9 @@ class PDFTextLoader:
         return path.endswith('.pdf') and os.path.isfile(path)
 
     def load(self, path, options={}):
+        from pdfminer.high_level import extract_text
+        from pdfminer.layout import LAParams
+
         page_numbers = options.get('pages', None)
         # LAParams: parameters for layout analysis
         # Ref. https://pdfminersix.readthedocs.io/en/latest/reference/composable.html
@@ -122,7 +123,7 @@ if __name__ == '__main__':
         f.write(doc.page_content)
 
     if args.output_file:
-        with open(args.output, 'w') as f:
+        with open(args.output_file, 'w') as f:
             print_doc(doc, f)
 
     print_doc(doc, sys.stdout)
