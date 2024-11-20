@@ -20,10 +20,9 @@ from langchain.tools import BaseTool
 from llm import (
     create_llm,
     extend_llm_callbacks,
-    expand_message,
 )
 from embeddings import create_embeddings
-
+from message import MessageExpander
 
 
 class IndexHolder:
@@ -129,7 +128,31 @@ def chat(
         handle_parsing_errors=True
     )
     # Expand message commands
-    message = expand_message(message)
+    messages = [MessageExpander().expand_message(message)]
 
-    response = agent_chain.invoke({'input': message}, config={'callbacks': extend_llm_callbacks()})
+    response = agent_chain.invoke({'input': messages}, config={'callbacks': extend_llm_callbacks()})
     return response['output']
+
+def main():
+    from dotenv import load_dotenv
+    from argparse import ArgumentParser
+    from yaml import safe_load
+
+    load_dotenv(override=True)
+
+    parser = ArgumentParser()
+    parser.add_argument('--config', '-c', type=str, default='config.yaml')
+    parser.add_argument('--prompt-file', '-p', required=True,
+                        help='Prompt file')
+    
+    args = parser.parse_args()
+    with open(args.prompt_file) as f:
+        prompt = f.read()
+    with open(args.config, 'r') as f:
+        config = safe_load(f) 
+    indexes = create_index_list(config)
+    response = chat(prompt, ChatMessageHistory(), indexes)
+    print(response)
+
+if __name__ == '__main__':
+    main()
