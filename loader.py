@@ -3,6 +3,7 @@ import os
 import re
 from langchain_community.document_loaders import ConfluenceLoader
 from langchain_community.document_loaders import WebBaseLoader
+from langchain_community.document_loaders import YoutubeLoader as YtLoader
 from langchain_core.documents import Document
 
 
@@ -77,6 +78,28 @@ class WebPageLoader:
             doc.metadata['title'] = 'Untitled'
         return doc
 
+# dependencies: langchain_community, youtube-transcript-api, pytube
+class YoutubeLoader:
+    def __init__(self):
+        pass
+
+    def is_target_path(self, path):
+        from urllib.parse import urlparse
+        parsed_url = urlparse(path)
+        return parsed_url.netloc == 'www.youtube.com'
+
+    def load(self, path, options={}):
+        loader = YtLoader.from_youtube_url(
+            path,
+            # ref. https://github.com/pytube/pytube/issues/1589
+            # add_video_info=True,
+            language=['ja', 'en']
+        )
+        doc = loader.load()[0]
+        if not doc.metadata.get('title'):
+            doc.metadata['title'] = 'Untitled'
+        return doc
+
 class PDFTextLoader:
     def __init__(self):
         pass
@@ -108,7 +131,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     options = LoaderOptionParser().parse(args.options) if args.options else {}
 
-    loaders = [ConfluencePageLoader(), WebPageLoader(), PDFTextLoader()]
+    loaders = [ConfluencePageLoader(), YoutubeLoader(), WebPageLoader(), PDFTextLoader()]
     for loader in loaders:
         if loader.is_target_path(args.source):
             doc = loader.load(args.source, options)
