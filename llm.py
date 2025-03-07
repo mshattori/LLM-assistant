@@ -74,8 +74,8 @@ def main():
     parser.add_argument('--enable-import', '-i', action='store_true',
                         default=True, help='Enable file imports in messages')
     parser.add_argument('--verbose', '-v', action='store_true')
-    parser.add_argument('--message', '-m', type=str, required=False)
-    parser.add_argument('--model', type=str, required=False,
+    parser.add_argument('--message', type=str, required=False)
+    parser.add_argument('--model', '-m', type=str, required=False,
                         help='Model name to override the default or system file model')
     parser.add_argument('--env-file', '-e', type=str, default=default_env_file,
                         help=f'Path to the .env file to load (default: {default_env_file})')
