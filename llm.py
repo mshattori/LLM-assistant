@@ -2,6 +2,7 @@
 import os
 import sys
 from argparse import ArgumentParser
+from pathlib import Path
 
 from dotenv import load_dotenv
 import yaml
@@ -63,7 +64,7 @@ def load_prompt_file(prompt_file: str) -> dict:
 
 def main():
     """Main function to execute the script."""
-    load_dotenv(override=True)
+    default_env_file = str(Path.home() / '.llm.env')
     parser = ArgumentParser()
     parser.add_argument('--prompt-file', '-p', required=False,
                         help='Prompt file')
@@ -76,7 +77,11 @@ def main():
     parser.add_argument('--message', '-m', type=str, required=False)
     parser.add_argument('--model', type=str, required=False,
                         help='Model name to override the default or system file model')
+    parser.add_argument('--env-file', '-e', type=str, default=default_env_file,
+                        help=f'Path to the .env file to load (default: {default_env_file})')
     args = parser.parse_args()
+
+    load_dotenv(args.env_file, override=True)
 
     if not args.message and not args.prompt_file:
         parser.print_usage()
